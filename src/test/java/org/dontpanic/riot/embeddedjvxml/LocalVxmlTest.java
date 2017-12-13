@@ -4,13 +4,12 @@ import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.jvoicexml.ConnectionInformation;
 import org.jvoicexml.JVoiceXmlMain;
 import org.jvoicexml.JVoiceXmlMainListener;
-import org.jvoicexml.Session;
 import org.jvoicexml.client.text.TextServer;
 import org.jvoicexml.event.ErrorEvent;
 import org.jvoicexml.event.JVoiceXMLEvent;
+import org.jvoicexml.voicexmlunit.Call;
 
 import java.net.URL;
 
@@ -18,8 +17,9 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
     private static final Logger LOGGER = Logger.getLogger(LocalVxmlTest.class);
 
+    private static final int TEXT_SERVER_PORT = 4242;
+
     private TextServer server;
-    private Session session;
     private JVoiceXmlMain jvxml;
 
     @Before
@@ -31,21 +31,13 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
         wait();
 
-        server = new TextServer(4242);
+        server = new TextServer(TEXT_SERVER_PORT);
         server.start();
         server.waitStarted();
-        final ConnectionInformation client = server.getConnectionInformation();
-        session = jvxml.createSession(client);
     }
 
     @After
     public void endSession() throws ErrorEvent {
-        if (session != null) {
-            session.waitSessionEnd();
-            session.hangup();
-            server.stopServer(); // Expect a SocketException to be logged and swallowed!
-        }
-
         if (jvxml != null) {
             jvxml.shutdown();
         }
@@ -54,7 +46,12 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
     @Test
     public void testLocalVxml() throws Exception, ErrorEvent {
         final URL vxmlFile = getClass().getClassLoader().getResource("hello.vxml");
-        session.call(vxmlFile.toURI());
+
+        Call call = new EmbeddedServerTextCall(jvxml, server);
+        call.call(vxmlFile.toURI());
+        call.hears("Hello World!");
+        call.hears("Goodbye!");
+        //call.hangup();
     }
 
     @Override
