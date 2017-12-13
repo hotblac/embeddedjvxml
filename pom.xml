@@ -98,6 +98,11 @@
             <!--<scope>test</scope>-->
         </dependency>
         <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-library</artifactId>
+            <version>1.3</version>
+        </dependency>
+        <dependency>
             <groupId>org.jvoicexml</groupId>
             <artifactId>org.jvoicexml.voicexmlunit</artifactId>
             <version>${jvoicexml.version}</version>

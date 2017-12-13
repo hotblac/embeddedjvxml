@@ -7,7 +7,7 @@ import java.util.Collection;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
-import org.junit.Assert;
+import org.junit.Assert; // TODO remove this dependency on JUnit
 import org.jvoicexml.DtmfInput;
 import org.jvoicexml.ConnectionInformation;
 import org.jvoicexml.JVoiceXml;

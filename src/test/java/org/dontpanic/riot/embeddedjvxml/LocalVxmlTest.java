@@ -9,9 +9,24 @@ import org.jvoicexml.JVoiceXmlMainListener;
 import org.jvoicexml.client.text.TextServer;
 import org.jvoicexml.event.ErrorEvent;
 import org.jvoicexml.event.JVoiceXMLEvent;
+import org.jvoicexml.event.plain.ConnectionDisconnectHangupEvent;
 import org.jvoicexml.voicexmlunit.Call;
+import org.jvoicexml.xml.ssml.Speak;
+import org.jvoicexml.xml.ssml.SsmlDocument;
 
+import javax.xml.namespace.NamespaceContext;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+
+import static junit.framework.TestCase.fail;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.endsWith;
+import static org.hamcrest.Matchers.instanceOf;
 
 public class LocalVxmlTest implements JVoiceXmlMainListener {
 
@@ -44,14 +59,34 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
     }
 
     @Test
-    public void testLocalVxml() throws Exception, ErrorEvent {
-        final URL vxmlFile = getClass().getClassLoader().getResource("hello.vxml");
-
+    public void testLocalVxml() throws Exception {
         Call call = new EmbeddedServerTextCall(jvxml, server);
-        call.call(vxmlFile.toURI());
+        call.call(fileUri("hello.vxml"));
         call.hears("Hello World!");
         call.hears("Goodbye!");
         //call.hangup();
+    }
+
+    @Test
+    public void testAudioResponse() throws Exception {
+        Call call = new EmbeddedServerTextCall(jvxml, server);
+        call.call(fileUri("audio.vxml"));
+
+        // Expect two audio responses
+        final String audioSrc1 = audioSrc(call.getNextOutput());
+        assertThat(audioSrc1, endsWith("audio-in-block.wav"));
+
+
+        final String audioSrc2 = audioSrc(call.getNextOutput());
+        assertThat(audioSrc2, endsWith("audio-in-prompt.wav"));
+
+        try {
+            call.getNextOutput();
+            fail("No further output expected");
+        } catch (AssertionError e) {
+            // Expected event
+            assertThat(e.getCause(), instanceOf(ConnectionDisconnectHangupEvent.class));
+        }
     }
 
     @Override
@@ -67,5 +102,20 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
     public void jvxmlStartupError(final Throwable exception) {
         LOGGER.error("error starting JVoiceML", exception);
         jvxmlStarted(); // cancel
+    }
+
+    private URI fileUri(String filename) throws URISyntaxException {
+        final URL vxmlFile = getClass().getClassLoader().getResource(filename);
+        return vxmlFile.toURI();
+    }
+
+    private String audioSrc(SsmlDocument document) throws XPathExpressionException {
+        NamespaceContext ns = new SimpleNamespaceContext("ssml", Speak.DEFAULT_XMLNS);
+
+        final XPathFactory xpathFactory = XPathFactory.newInstance();
+        final XPath xpath = xpathFactory.newXPath();
+        xpath.setNamespaceContext(ns);
+
+        return (String)xpath.evaluate("/ssml:speak/ssml:audio/@src", document.getDocument(), XPathConstants.STRING);
     }
 }
