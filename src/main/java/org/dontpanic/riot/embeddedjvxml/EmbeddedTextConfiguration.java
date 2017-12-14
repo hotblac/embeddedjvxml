@@ -25,11 +25,7 @@ package org.dontpanic.riot.embeddedjvxml;
 import java.util.Collection;
 
 import org.apache.log4j.Logger;
-import org.jvoicexml.Configuration;
-import org.jvoicexml.DocumentServer;
-import org.jvoicexml.DtmfRecognizerProperties;
-import org.jvoicexml.ImplementationPlatformFactory;
-import org.jvoicexml.SpeechRecognizerProperties;
+import org.jvoicexml.*;
 import org.jvoicexml.documentserver.JVoiceXmlDocumentServer;
 import org.jvoicexml.documentserver.schemestrategy.FileSchemeStrategy;
 import org.jvoicexml.documentserver.schemestrategy.HttpSchemeStrategy;
@@ -41,9 +37,7 @@ import org.jvoicexml.interpreter.DialogFactory;
 import org.jvoicexml.interpreter.GrammarProcessor;
 import org.jvoicexml.interpreter.datamodel.DataModel;
 import org.jvoicexml.interpreter.datamodel.ecmascript.EcmaScriptDataModel;
-import org.jvoicexml.interpreter.dialog.ExecutableMenuForm;
-import org.jvoicexml.interpreter.dialog.ExecutablePlainForm;
-import org.jvoicexml.interpreter.dialog.JVoiceXmlDialogFactory;
+import org.jvoicexml.interpreter.dialog.*;
 import org.jvoicexml.interpreter.grammar.GrammarIdentifier;
 import org.jvoicexml.interpreter.grammar.JVoiceXmlGrammarProcessor;
 import org.jvoicexml.interpreter.grammar.identifier.SrgsXmlGrammarIdentifier;
@@ -131,15 +125,27 @@ public class EmbeddedTextConfiguration implements Configuration {
             server.addSchemeStrategy(new FileSchemeStrategy());
             return (T) server;
         } else if (baseClass == ImplementationPlatformFactory.class) {
-            return (T) new JVoiceXmlImplementationPlatformFactory();
+            final JVoiceXmlImplementationPlatformFactory factory = new JVoiceXmlImplementationPlatformFactory();
+            try {
+                factory.init(this);
+            } catch (ConfigurationException e) {
+                LOGGER.warn("Failed to initialize JVoiceXmlImplementationPlatformFactory");
+            }
+            return (T) factory;
         } else if (baseClass == SpeechRecognizerProperties.class) {
             return (T) new SpeechRecognizerProperties();
         } else if (baseClass == DtmfRecognizerProperties.class) {
-            return (T) new DtmfRecognizerProperties();
+            final DtmfRecognizerProperties props = new DtmfRecognizerProperties();
+            props.setInterdigittimeout("1s");
+            return (T) props;
         } else if (baseClass == DialogFactory.class) {
             final JVoiceXmlDialogFactory factory = new JVoiceXmlDialogFactory();
             factory.addDialogMapping(Form.TAG_NAME, new ExecutablePlainForm());
-            factory.addDialogMapping(Menu.TAG_NAME, new ExecutableMenuForm());
+
+            final ExecutableMenuForm executableMenuForm = new ExecutableMenuForm();
+            final ChoiceConverter choiceConverter = new SrgsXmlChoiceConverter();
+            executableMenuForm.setChoiceConverter(choiceConverter);
+            factory.addDialogMapping(Menu.TAG_NAME, executableMenuForm);
             return (T) factory;
         } else if (baseClass == GrammarProcessor.class) {
             return (T) new JVoiceXmlGrammarProcessor();

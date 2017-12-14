@@ -256,6 +256,14 @@ public class EmbeddedServerTextCall implements Call {
         for (CallListener listener : listeners) {
             listener.entered(digits);
         }
+
+        // Ignore spurious output update - take it from the buffer and discard
+        try {
+            outputBuffer.nextMessage(1000);
+        } catch (InterruptedException | JVoiceXMLEvent | TimeoutException e) {
+            LOGGER.warn("Interrupted while waiting for next message", e);
+        }
+
         LOGGER.info("entered '" + digits + "'");
     }
 

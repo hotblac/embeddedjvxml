@@ -89,6 +89,44 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
         }
     }
 
+    @Test
+    public void testDtmfInput() throws Exception {
+        Call call = new EmbeddedServerTextCall(jvxml, server);
+        call.call(fileUri("dtmf.vxml"));
+        call.hears("Do you like this example? Please enter 1 for yes or 2 for no");
+        call.enter("1");
+        call.hears("You like this example.");
+    }
+
+    @Test
+    public void testDtmfInvalidInput() throws Exception {
+        Call call = new EmbeddedServerTextCall(jvxml, server);
+        call.call(fileUri("dtmf.vxml"));
+        call.hears("Do you like this example? Please enter 1 for yes or 2 for no");
+        call.enter("9");
+        // Expect reprompt
+        call.hears("Do you like this example? Please enter 1 for yes or 2 for no");
+    }
+
+    @Test
+    public void testSpokenInput() throws Exception {
+        Call call = new EmbeddedServerTextCall(jvxml, server);
+        call.call(fileUri("input.vxml"));
+        call.hears("Do you like this example?");
+        call.say("yes");
+        call.hears("You like this example.");
+    }
+
+    @Test
+    public void testSpokenInvalidInput() throws Exception {
+        Call call = new EmbeddedServerTextCall(jvxml, server);
+        call.call(fileUri("input.vxml"));
+        call.hears("Do you like this example?");
+        call.say("um...");
+        // Expect reprompt
+        call.hears("Do you like this example?");
+    }
+
     @Override
     public synchronized void jvxmlStarted() {
         notifyAll();
