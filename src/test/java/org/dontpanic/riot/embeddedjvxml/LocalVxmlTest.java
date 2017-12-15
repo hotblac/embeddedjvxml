@@ -27,6 +27,7 @@ import static junit.framework.TestCase.fail;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.instanceOf;
+import static org.junit.Assert.assertNotNull;
 
 public class LocalVxmlTest implements JVoiceXmlMainListener {
 
@@ -127,6 +128,14 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
         call.hears("Do you like this example?");
     }
 
+    @Test
+    public void testGoto() throws Exception {
+        Call call = new EmbeddedServerTextCall(jvxml, server);
+        call.call(fileUri("flow1.vxml"));
+        call.hears("Prompt from flow1.vxml");
+        call.hears("Prompt from flow2.vxml");
+    }
+
     @Override
     public synchronized void jvxmlStarted() {
         notifyAll();
@@ -144,6 +153,7 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
     private URI fileUri(String filename) throws URISyntaxException {
         final URL vxmlFile = getClass().getClassLoader().getResource(filename);
+        assertNotNull("File not found: " + filename, vxmlFile);
         return vxmlFile.toURI();
     }
 
