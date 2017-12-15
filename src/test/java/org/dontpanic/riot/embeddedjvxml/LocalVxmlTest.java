@@ -131,9 +131,17 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
     @Test
     public void testGoto() throws Exception {
         Call call = new EmbeddedServerTextCall(jvxml, server);
-        call.call(fileUri("flow1.vxml"));
-        call.hears("Prompt from flow1.vxml");
-        call.hears("Prompt from flow2.vxml");
+        call.call(fileUri("goto1.vxml"));
+        call.hears("Prompt from goto1.vxml");
+        call.hears("Prompt from goto2.vxml");
+    }
+
+    @Test
+    public void testSubmit() throws Exception {
+        Call call = new EmbeddedServerTextCall(jvxml, server);
+        call.call(fileUri("submit1.vxml"));
+        call.hears("Prompt from submit1.vxml");
+        call.hears("Prompt from submit2.vxml");
     }
 
     @Override

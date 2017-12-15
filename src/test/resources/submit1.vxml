@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<vxml xmlns="http://www.w3.org/2001/vxml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    version="2.1" xml:lang="en-GB"
+    xsi:schematicLocation="http://www.w3.org/2001/vxml http://www.w3.org/TR/voicexml20/vxml.xsd">
+    <form>
+        <block>
+            <prompt>Prompt from submit1.vxml</prompt>
+            <submit next="submit2.vxml"/>
+        </block>
+    </form>
+</vxml>
