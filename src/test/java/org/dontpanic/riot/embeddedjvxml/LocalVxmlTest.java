@@ -1,12 +1,13 @@
 package org.dontpanic.riot.embeddedjvxml;
 
 import org.apache.log4j.Logger;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
+import org.jvoicexml.ConnectionInformation;
 import org.jvoicexml.JVoiceXmlMain;
 import org.jvoicexml.JVoiceXmlMainListener;
+import org.jvoicexml.Session;
 import org.jvoicexml.client.text.TextServer;
+import org.jvoicexml.event.ErrorEvent;
 import org.jvoicexml.event.plain.ConnectionDisconnectHangupEvent;
 import org.jvoicexml.voicexmlunit.Call;
 import org.jvoicexml.xml.ssml.Speak;
@@ -20,6 +21,7 @@ import javax.xml.xpath.XPathFactory;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.concurrent.CountDownLatch;
 
 import static junit.framework.TestCase.fail;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -27,42 +29,75 @@ import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.Assert.assertNotNull;
 
-public class LocalVxmlTest implements JVoiceXmlMainListener {
+public class LocalVxmlTest {
 
     private static final Logger LOGGER = Logger.getLogger(LocalVxmlTest.class);
 
     private static final long TEST_TIMEOUT_MS = 4000;
     private static final int TEXT_SERVER_PORT = 4242;
 
-    private TextServer server;
-    private JVoiceXmlMain jvxml;
+    private Session session;
+    private Call call;
+    private static TextServer textServer;
+    private static JVoiceXmlMain jvxml;
 
-    @Before
-    public synchronized void startSession() throws Exception {
+    private static final CountDownLatch startupLatch = new CountDownLatch(1);
+    private static final CountDownLatch shutdownLatch = new CountDownLatch(1);
+
+    @BeforeClass
+    public static void startJvxml() throws Exception {
         final EmbeddedTextConfiguration config = new EmbeddedTextConfiguration();
         jvxml = new JVoiceXmlMain(config);
-        jvxml.addListener(this);
+        jvxml.addListener(new JVoiceXmlMainListener() {
+            @Override
+            public void jvxmlStarted() {
+                startupLatch.countDown();
+            }
+
+            @Override
+            public void jvxmlTerminated() {
+                shutdownLatch.countDown();
+            }
+
+            @Override
+            public void jvxmlStartupError(final Throwable exception) {
+                LOGGER.error("error starting JVoiceML", exception);
+                startupLatch.countDown(); // cancel
+            }
+        });
         jvxml.start();
+        startupLatch.await();
+    }
 
-        wait();
+    @Before
+    public void startCall() throws Exception, ErrorEvent {
 
-        server = new TextServer(TEXT_SERVER_PORT);
-        server.start();
-        server.waitStarted();
+        // Note: A TextServer is attached to a single session on construction
+        // and so must be started for every new session.
+        textServer = new TextServer(TEXT_SERVER_PORT);
+        textServer.start();
+        textServer.waitStarted();
+
+        // A new session must be created for each call
+        final ConnectionInformation info = textServer.getConnectionInformation();
+        session = jvxml.createSession(info);
+
+        call = new EmbeddedServerTextCall(session, textServer);
     }
 
     @After
-    public synchronized void endSession() throws Exception {
-        server.stopServer();
+    public void endSession() throws ErrorEvent {
+        textServer.stopServer();
+    }
+
+    @AfterClass
+    public static void stopJvxml() {
         jvxml.getDocumentServer().stop();
         jvxml.shutdown();
-
-        wait();
     }
 
     @Test(timeout = TEST_TIMEOUT_MS)
     public void testLocalVxml() throws Exception {
-        Call call = new EmbeddedServerTextCall(jvxml, server);
         call.call(fileUri("hello.vxml"));
         call.hears("Hello World!");
         call.hears("Goodbye!");
@@ -71,7 +106,6 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
     @Test(timeout = TEST_TIMEOUT_MS)
     public void testAudioResponse() throws Exception {
-        Call call = new EmbeddedServerTextCall(jvxml, server);
         call.call(fileUri("audio.vxml"));
 
         // Expect two audio responses
@@ -93,7 +127,6 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
     @Test(timeout = TEST_TIMEOUT_MS)
     public void testDtmfInput() throws Exception {
-        Call call = new EmbeddedServerTextCall(jvxml, server);
         call.call(fileUri("dtmf.vxml"));
         call.hears("Do you like this example? Please enter 1 for yes or 2 for no");
         call.enter("1");
@@ -102,7 +135,6 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
     @Test(timeout = TEST_TIMEOUT_MS)
     public void testDtmfInvalidInput() throws Exception {
-        Call call = new EmbeddedServerTextCall(jvxml, server);
         call.call(fileUri("dtmf.vxml"));
         call.hears("Do you like this example? Please enter 1 for yes or 2 for no");
         call.enter("9");
@@ -112,7 +144,6 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
     @Test(timeout = TEST_TIMEOUT_MS)
     public void testSpokenInput() throws Exception {
-        Call call = new EmbeddedServerTextCall(jvxml, server);
         call.call(fileUri("input.vxml"));
         call.hears("Do you like this example?");
         call.say("yes");
@@ -121,7 +152,6 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
     @Test(timeout = TEST_TIMEOUT_MS)
     public void testSpokenInvalidInput() throws Exception {
-        Call call = new EmbeddedServerTextCall(jvxml, server);
         call.call(fileUri("input.vxml"));
         call.hears("Do you like this example?");
         call.say("um...");
@@ -131,7 +161,6 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
     @Test(timeout = TEST_TIMEOUT_MS)
     public void testGoto() throws Exception {
-        Call call = new EmbeddedServerTextCall(jvxml, server);
         call.call(fileUri("goto1.vxml"));
         call.hears("Prompt from goto1.vxml");
         call.hears("Prompt from goto2.vxml");
@@ -139,26 +168,9 @@ public class LocalVxmlTest implements JVoiceXmlMainListener {
 
     @Test(timeout = TEST_TIMEOUT_MS)
     public void testSubmit() throws Exception {
-        Call call = new EmbeddedServerTextCall(jvxml, server);
         call.call(fileUri("submit1.vxml"));
         call.hears("Prompt from submit1.vxml");
         call.hears("Prompt from submit2.vxml");
-    }
-
-    @Override
-    public synchronized void jvxmlStarted() {
-        notifyAll();
-    }
-
-    @Override
-    public synchronized void jvxmlTerminated() {
-        notifyAll();
-    }
-
-    @Override
-    public void jvxmlStartupError(final Throwable exception) {
-        LOGGER.error("error starting JVoiceML", exception);
-        jvxmlStarted(); // cancel
     }
 
     private URI fileUri(String filename) throws URISyntaxException {

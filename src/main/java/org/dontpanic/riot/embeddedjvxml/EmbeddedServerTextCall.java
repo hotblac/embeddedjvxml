@@ -9,7 +9,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.log4j.Logger;
 import org.junit.Assert; // TODO remove this dependency on JUnit
 import org.jvoicexml.DtmfInput;
-import org.jvoicexml.ConnectionInformation;
 import org.jvoicexml.JVoiceXml;
 import org.jvoicexml.Session;
 import org.jvoicexml.client.text.TextListener;
@@ -28,7 +27,7 @@ public class EmbeddedServerTextCall implements Call {
     /** Known call listeners. */
     private final Collection<CallListener> listeners;
     /** The text server. */
-    private TextServer server;
+    private TextServer textServer;
     /** Used port number. */
     private int portNumber;
     /** Buffered messages from JVoiceXml. */
@@ -48,16 +47,16 @@ public class EmbeddedServerTextCall implements Call {
 
     /**
      * Constructs a new call.
-     * @param jvxml embedded JVoiceXML server
      * @throws InterruptedException error initializing the output buffer
      */
-    public EmbeddedServerTextCall(JVoiceXml jvxml, TextServer textServer) throws InterruptedException {
-        this.jvxml = jvxml;
-        server = textServer;
+    public EmbeddedServerTextCall(Session session, TextServer textServer) throws InterruptedException {
+        this.session = session;
+        this.textServer = textServer;
+
         outputBuffer = new OutputMessageBuffer();
-        server.addTextListener(outputBuffer);
+        this.textServer.addTextListener(outputBuffer);
         inputMonitor = new InputMonitor();
-        server.addTextListener(inputMonitor);
+        this.textServer.addTextListener(inputMonitor);
         listeners = new java.util.ArrayList<CallListener>();
     }
 
@@ -68,7 +67,7 @@ public class EmbeddedServerTextCall implements Call {
      * @param listener the listener to add
      */
     public void addTextListener(final TextListener listener) {
-        server.addTextListener(listener);
+        textServer.addTextListener(listener);
     }
 
     /**
@@ -81,9 +80,6 @@ public class EmbeddedServerTextCall implements Call {
             lastError = null;
 
             // run the dialog
-            final ConnectionInformation info =
-                    server.getConnectionInformation();
-            session = jvxml.createSession(info);
             session.call(uri);
             for (CallListener listener : listeners) {
                 listener.called(uri);
@@ -211,7 +207,7 @@ public class EmbeddedServerTextCall implements Call {
             } else {
                 inputMonitor.waitUntilExpectingInput(timeout);
             }
-            server.sendInput(utterance);
+            textServer.sendInput(utterance);
             for (CallListener listener : listeners) {
                 listener.said(utterance);
             }
@@ -381,8 +377,8 @@ public class EmbeddedServerTextCall implements Call {
             session = null;
         }
 
-        server.stopServer();
-        LOGGER.info("server stopped");
+        textServer.stopServer();
+        LOGGER.info("textServer stopped");
     }
 
     /**
